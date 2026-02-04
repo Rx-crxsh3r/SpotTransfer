@@ -50,14 +50,21 @@ def get_all_tracks(link, market):
     logger.info(f"Fetching tracks from Spotify playlist for market: {market}")
     
     playlist_id = extract_playlist_id(link)
-    client_id = os.getenv('SPOTIPY_CLIENT_ID')
-    client_secret = os.getenv('SPOTIPY_CLIENT_SECRET')
     
-    if not client_id or not client_secret:
-        logger.error("Spotify credentials not found in environment variables")
-        raise Exception("SPOTIPY_CLIENT_ID and SPOTIPY_CLIENT_SECRET must be set")
-    
-    access_token = get_spotify_access_token(client_id, client_secret)
+    # Check for bearer token first (temporary workaround)
+    bearer_token = os.getenv('SPOTIFY_BEARER_TOKEN')
+    if bearer_token:
+        logger.warning("Using temporary SPOTIFY_BEARER_TOKEN (will expire soon!)")
+        access_token = bearer_token
+    else:
+        client_id = os.getenv('SPOTIPY_CLIENT_ID')
+        client_secret = os.getenv('SPOTIPY_CLIENT_SECRET')
+        
+        if not client_id or not client_secret:
+            logger.error("Spotify credentials not found in environment variables")
+            raise Exception("SPOTIPY_CLIENT_ID and SPOTIPY_CLIENT_SECRET must be set (or use SPOTIFY_BEARER_TOKEN temporarily)")
+        
+        access_token = get_spotify_access_token(client_id, client_secret)
     
     url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?market={market}&limit=100"
     headers = {
@@ -100,9 +107,16 @@ def get_playlist_name(link):
     logger.debug("Fetching playlist name from Spotify")
     
     playlist_id = extract_playlist_id(link)
-    client_id = os.getenv('SPOTIPY_CLIENT_ID')
-    client_secret = os.getenv('SPOTIPY_CLIENT_SECRET')
-    access_token = get_spotify_access_token(client_id, client_secret)
+    
+    # Check for bearer token first (temporary workaround)
+    bearer_token = os.getenv('SPOTIFY_BEARER_TOKEN')
+    if bearer_token:
+        logger.warning("Using temporary SPOTIFY_BEARER_TOKEN (will expire soon!)")
+        access_token = bearer_token
+    else:
+        client_id = os.getenv('SPOTIPY_CLIENT_ID')
+        client_secret = os.getenv('SPOTIPY_CLIENT_SECRET')
+        access_token = get_spotify_access_token(client_id, client_secret)
     
     url = f"https://api.spotify.com/v1/playlists/{playlist_id}"
     headers = {

@@ -9,16 +9,74 @@ logger = logging.getLogger(__name__)
 def parse_headers(headers_text):
     """
     Convert headers from plain text format to proper HTTP header format.
-    Supports both formats:
+    Supports multiple formats:
+    - JSON format: {"requestHeaders": {"headers": [{"name": "...", "value": "..."}]}}
     - Standard format: "header: value"
     - Plain format: "header\\nvalue\\nheader2\\nvalue2"
     """
+    import json
+    
     logger.debug("Parsing YouTube Music headers")
     logger.debug(f"Headers text length: {len(headers_text) if headers_text else 0}")
     
     if not headers_text or not headers_text.strip():
         logger.error("Headers text is empty")
         raise Exception("Headers cannot be empty")
+    
+    # Try to parse as JSON first
+    try:
+        logger.debug("Attempting to parse headers as JSON")
+        json_data = json.loads(headers_text.strip())
+        
+        # Handle the structure: {"requestHeaders": {"headers": [...]}}
+        if isinstance(json_data, dict):
+            headers_array = None
+            
+            # Check for requestHeaders.headers structure
+            if "requestHeaders" in json_data and "headers" in json_data["requestHeaders"]:
+                headers_array = json_data["requestHeaders"]["headers"]
+                logger.debug("Found requestHeaders.headers structure")
+            # Check for direct headers array
+            elif "headers" in json_data:
+                headers_array = json_data["headers"]
+                logger.debug("Found direct headers array")
+            
+            if headers_array and isinstance(headers_array, list):
+                logger.debug(f"Found {len(headers_array)} headers in JSON")
+                
+                # Convert JSON array to header format
+                formatted_headers = []
+                for header in headers_array:
+                    if "name" in header and "value" in header:
+                        # Convert header names to lowercase for case-insensitive matching
+                        header_name = header["name"].lower()
+                        header_value = header["value"]
+                        
+                        # Map common header variations to expected names
+                        # ytmusicapi expects lowercase headers
+                        formatted_headers.append(f"{header_name}: {header_value}")
+                    else:
+                        logger.warning(f"Skipping malformed header: {header}")
+                
+                result = '\n'.join(formatted_headers)
+                logger.info(f"Successfully converted {len(formatted_headers)} JSON headers to text format")
+                
+                # Debug: Check which required headers are present
+                header_names = [h.split(':')[0].strip().lower() for h in formatted_headers]
+                logger.debug(f"Header names found: {', '.join(header_names)}")
+                
+                required_headers = ['cookie', 'x-goog-authuser']
+                missing = [h for h in required_headers if h not in header_names]
+                if missing:
+                    logger.warning(f"Missing required headers: {', '.join(missing)}")
+                else:
+                    logger.info("All required headers present")
+                
+                return result
+    except json.JSONDecodeError:
+        logger.debug("Headers are not in JSON format, trying text format")
+    except Exception as e:
+        logger.warning(f"Error parsing JSON headers: {str(e)}, falling back to text parsing")
     
     lines = [line.strip() for line in headers_text.strip().split('\n') if line.strip()]
     logger.debug(f"Split headers into {len(lines)} lines")
